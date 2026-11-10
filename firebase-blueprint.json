@@ -1,0 +1,215 @@
+{
+  "entities": {
+    "PortalConfig": {
+      "title": "PortalConfig",
+      "description": "Configuration settings for Legend of Fire Bangla QR Payment Portal",
+      "type": "object",
+      "properties": {
+        "brandName": {
+          "type": "string",
+          "description": "Name of the brand or portal",
+          "maxLength": 100
+        },
+        "brandSubtitle": {
+          "type": "string",
+          "description": "Subtitle displayed beneath brand name",
+          "maxLength": 150
+        },
+        "announcementText": {
+          "type": "string",
+          "description": "Top promotional banner text in Bangla",
+          "maxLength": 200
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "URL or base64 data for portal logo",
+          "maxLength": 500000
+        },
+        "qrImageUrl": {
+          "type": "string",
+          "description": "Bangla QR code image link or base64 data URL",
+          "maxLength": 1500000
+        },
+        "qrMerchantName": {
+          "type": "string",
+          "description": "Registered merchant title for the QR",
+          "maxLength": 100
+        },
+        "qrMerchantId": {
+          "type": "string",
+          "description": "Terminal ID or Bangla QR merchant ID",
+          "maxLength": 64
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "URL of the step-by-step video tutorial",
+          "maxLength": 2000000
+        },
+        "videoTitle": {
+          "type": "string",
+          "description": "Title of the video guide",
+          "maxLength": 120
+        },
+        "videoBanglaDesc": {
+          "type": "string",
+          "description": "Bangla description below the video",
+          "maxLength": 500
+        },
+        "supportPhone": {
+          "type": "string",
+          "description": "Helpline phone or WhatsApp number",
+          "maxLength": 30
+        },
+        "supportTelegram": {
+          "type": "string",
+          "description": "Telegram support username or link",
+          "maxLength": 100
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Admin UID or email who made the update",
+          "maxLength": 128
+        }
+      },
+      "required": ["brandName", "brandSubtitle", "qrImageUrl"]
+    },
+    "PaymentInstruction": {
+      "title": "PaymentInstruction",
+      "description": "Step by step guide item for Bangla QR payment",
+      "type": "object",
+      "properties": {
+        "stepNumber": {
+          "type": "number",
+          "description": "Step sequence integer"
+        },
+        "title": {
+          "type": "string",
+          "description": "Step heading in Bangla",
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "description": "Full instruction details in Bangla",
+          "maxLength": 400
+        },
+        "iconName": {
+          "type": "string",
+          "description": "Lucide icon key identifier",
+          "maxLength": 50
+        },
+        "badgeText": {
+          "type": "string",
+          "description": "Optional chip or tag text",
+          "maxLength": 50
+        }
+      },
+      "required": ["stepNumber", "title", "description"]
+    },
+    "PortalFAQ": {
+      "title": "PortalFAQ",
+      "description": "Frequently asked questions in Bangla",
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "Question in Bangla",
+          "maxLength": 250
+        },
+        "answer": {
+          "type": "string",
+          "description": "Detailed answer in Bangla",
+          "maxLength": 1000
+        },
+        "order": {
+          "type": "number",
+          "description": "Display order index"
+        }
+      },
+      "required": ["question", "answer", "order"]
+    },
+    "PaymentConfirmation": {
+      "title": "PaymentConfirmation",
+      "description": "Payment verification transaction submission from user",
+      "type": "object",
+      "properties": {
+        "trxId": {
+          "type": "string",
+          "description": "Transaction ID from bKash, Nagad, or Rocket",
+          "maxLength": 64
+        },
+        "method": {
+          "type": "string",
+          "description": "Selected payment method (bKash, Nagad, Rocket)",
+          "enum": ["bKash", "Nagad", "Rocket", "Other"]
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount sent in BDT"
+        },
+        "senderPhone": {
+          "type": "string",
+          "description": "Sender phone number",
+          "maxLength": 20
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of confirmation",
+          "enum": ["pending", "verified", "rejected"]
+        },
+        "submittedAt": {
+          "type": "string",
+          "description": "ISO timestamp of submission"
+        }
+      },
+      "required": ["trxId", "method", "amount", "senderPhone"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Authorized administrator user profile",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Admin Google email address",
+          "maxLength": 128
+        },
+        "role": {
+          "type": "string",
+          "description": "Role string",
+          "enum": ["super_admin", "admin"]
+        },
+        "addedAt": {
+          "type": "string",
+          "description": "ISO date string"
+        }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/portal_settings/{settingId}": {
+      "schema": "PortalConfig",
+      "description": "Portal branding, QR image, video URL, and core settings"
+    },
+    "/instructions/{instructionId}": {
+      "schema": "PaymentInstruction",
+      "description": "Step-by-step Bangla payment guidelines"
+    },
+    "/faqs/{faqId}": {
+      "schema": "PortalFAQ",
+      "description": "Expandable Bangla FAQ items"
+    },
+    "/payment_confirmations/{confirmationId}": {
+      "schema": "PaymentConfirmation",
+      "description": "User submitted payment transaction references"
+    },
+    "/admins/{adminUid}": {
+      "schema": "AdminRecord",
+      "description": "Registered system administrators"
+    }
+  }
+}

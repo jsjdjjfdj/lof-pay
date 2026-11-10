@@ -1,0 +1,6 @@
+{
+  "name": "Legend of Fire - Official Bangla QR Payment Portal",
+  "description": "Official Bangla QR Payment Portal for Legend of Fire. Pay seamlessly with 0% cashout charge via bKash, Nagad, Rocket, and all Bangla QR supported banking apps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
