@@ -98,6 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (cleanInput === 'asif55' || cleanInput === '1234') {
       setIsAuthenticated(true);
       sessionStorage.setItem('admin_auth_success', 'true');
+      window.dispatchEvent(new Event('admin-auth-changed'));
       setPasswordError('');
       showStatus('success', 'স্বাগতম অ্যাডমিন! প্যানেল আনলক হয়েছে।');
     } else {
@@ -107,6 +108,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleLogout = () => {
     sessionStorage.removeItem('admin_auth_success');
+    window.dispatchEvent(new Event('admin-auth-changed'));
     setIsAuthenticated(false);
     setEnteredPassword('');
     showStatus('success', 'অ্যাডমিন প্যানেল লক করা হয়েছে।');
