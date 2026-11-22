@@ -1,4 +1,4 @@
-// IndexedDB storage helper for high-capacity media (videos & high-res images)
+// IndexedDB & Media encoding helpers for persistent QR images and chunked videos
 const DB_NAME = 'LegendOfFirePortalDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'media_store';
@@ -18,14 +18,18 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export async function saveLocalMedia(key: string, blob: Blob): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put(blob, key);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(blob, key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    // IndexedDB unavailable (e.g. private browsing) - safe to skip cache
+  }
 }
 
 export async function getLocalMedia(key: string): Promise<Blob | null> {
@@ -58,14 +62,47 @@ export async function deleteLocalMedia(key: string): Promise<void> {
   }
 }
 
-// Compress image to ensure it fits easily into Firestore document limits (< 200KB)
-export function compressImage(file: File, maxWidth = 900, maxHeight = 900, quality = 0.85): Promise<string> {
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const sub = bytes.subarray(i, i + chunkSize);
+    parts.push(String.fromCharCode(...sub));
+  }
+  return btoa(parts.join(''));
+}
+
+export function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Compress QR image cleanly so it always fits within Firestore 1MB doc limit (< 450KB)
+export function compressImage(
+  file: File,
+  maxWidth = 1000,
+  maxHeight = 1000,
+  quality = 0.9,
+  maxDataUrlChars = 450000
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
+      const originalDataUrl = event.target?.result as string;
+      // If original PNG/WebP/JPEG is already compact enough, keep exact original quality
+      if (originalDataUrl && originalDataUrl.length <= maxDataUrlChars) {
+        resolve(originalDataUrl);
+        return;
+      }
+
       const img = new Image();
-      img.src = event.target?.result as string;
+      img.src = originalDataUrl;
       img.onload = () => {
         let width = img.width;
         let height = img.height;
@@ -87,14 +124,30 @@ export function compressImage(file: File, maxWidth = 900, maxHeight = 900, quali
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(event.target?.result as string);
+          resolve(originalDataUrl);
           return;
         }
 
+        // Fill white background before JPEG export so transparent PNG QR codes stay readable
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        // Use JPEG for photographic QR or PNG if small
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
+
+        // Try PNG first if crisp QR fits under limit
+        const pngDataUrl = canvas.toDataURL('image/png');
+        if (pngDataUrl.length <= maxDataUrlChars) {
+          resolve(pngDataUrl);
+          return;
+        }
+
+        // Otherwise step JPEG quality down until it fits cleanly
+        let q = quality;
+        let result = canvas.toDataURL('image/jpeg', q);
+        while (result.length > maxDataUrlChars && q > 0.35) {
+          q -= 0.1;
+          result = canvas.toDataURL('image/jpeg', q);
+        }
+        resolve(result);
       };
       img.onerror = (err) => reject(err);
     };

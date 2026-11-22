@@ -1,5 +1,4 @@
 import express from 'express';
-import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
@@ -10,7 +9,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction =
+  process.env.NODE_ENV === 'production' || Boolean(process.env.K_SERVICE);
 
 // Ensure uploads folder exists
 const uploadsDir = path.resolve(__dirname, 'uploads');
@@ -33,19 +33,29 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 120 * 1024 * 1024, // 120MB limit for high-definition MP4 videos
+    fileSize: 120 * 1024 * 1024, // 120MB limit
   },
 });
 
 // JSON and URL-encoded body parsing
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint for Cloud Run / AI Studio Publish
+app.get('/healthz', (_req, res) => {
+  res.status(200).send('ok');
+});
 
 // Serve uploaded media files statically with range support for video streaming
 app.use('/uploads', express.static(uploadsDir));
 
+// Prevent missing /uploads/* from falling back to index.html
+app.use('/uploads', (_req, res) => {
+  res.status(404).json({ success: false, error: 'Media file not found' });
+});
+
 // API Endpoint: Upload Media (QR image or 9:16 MP4 video)
-app.post('/api/upload', upload.single('file'), (req: Request, res: Response): void => {
+app.post('/api/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     res.status(400).json({ success: false, error: 'No file uploaded' });
     return;
@@ -62,8 +72,8 @@ app.post('/api/upload', upload.single('file'), (req: Request, res: Response): vo
 });
 
 // API Endpoint: Delete file
-app.post('/api/delete', (req: Request, res: Response): void => {
-  const { url } = req.body;
+app.post('/api/delete', (req, res) => {
+  const { url } = req.body || {};
   if (!url || typeof url !== 'string' || !url.startsWith('/uploads/')) {
     res.json({ success: true });
     return;
@@ -83,6 +93,11 @@ app.post('/api/delete', (req: Request, res: Response): void => {
   res.json({ success: true });
 });
 
+// Prevent unknown /api/* from falling back to index.html
+app.use('/api', (_req, res) => {
+  res.status(404).json({ success: false, error: 'API route not found' });
+});
+
 async function startServer() {
   if (!isProduction) {
     const { createServer } = await import('vite');
@@ -93,9 +108,14 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'dist');
+    const indexHtmlPath = path.resolve(distPath, 'index.html');
     app.use(express.static(distPath));
-    app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET') {
+        next();
+        return;
+      }
+      res.sendFile(indexHtmlPath);
     });
   }
 

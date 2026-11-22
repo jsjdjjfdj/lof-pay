@@ -18,6 +18,8 @@ import {
   processAndSaveVideo,
   clearSavedVideo,
   clearSavedQr,
+  isFirestoreVideoUrl,
+  resolveFirestoreVideoUrl,
 } from '../firebase/portalService';
 import {
   DEFAULT_BANGLA_QR_DATA_URL,
@@ -71,6 +73,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Maintain separate independent states for QR and Video
   const [qrImageUrl, setQrImageUrl] = useState<string>(config.qrImageUrl || '');
   const [videoUrl, setVideoUrl] = useState<string>(config.videoUrl || '');
+  const [previewVideoSrc, setPreviewVideoSrc] = useState<string>('');
 
   // Synchronize when config changes, but keep existing unsaved edits
   useEffect(() => {
@@ -84,6 +87,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setVideoUrl(config.videoUrl);
     }
   }, [config.videoUrl]);
+
+  // Resolve firestore://media/... for admin thumbnail preview
+  useEffect(() => {
+    let active = true;
+    let blobUrl = '';
+    if (!videoUrl) {
+      setPreviewVideoSrc('');
+      return;
+    }
+    if (!isFirestoreVideoUrl(videoUrl)) {
+      setPreviewVideoSrc(videoUrl);
+      return;
+    }
+    resolveFirestoreVideoUrl(videoUrl)
+      .then((resolved) => {
+        if (!active) {
+          if (resolved.startsWith('blob:')) URL.revokeObjectURL(resolved);
+          return;
+        }
+        blobUrl = resolved;
+        setPreviewVideoSrc(resolved);
+      })
+      .catch(() => {
+        if (active) setPreviewVideoSrc('');
+      });
+    return () => {
+      active = false;
+      if (blobUrl && blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl);
+    };
+  }, [videoUrl]);
 
   if (!isOpen) return null;
 
@@ -174,17 +207,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     try {
       setProcessingVideo(true);
-      setUploadProgress(15);
+      setUploadProgress(5);
       showStatus('success', `ভিডিও আপলোড হচ্ছে (${(file.size / (1024 * 1024)).toFixed(1)} MB)...`);
 
       const newVideoUrl = await processAndSaveVideo(file, (p) => setUploadProgress(p));
       setVideoUrl(newVideoUrl);
       setUploadProgress(null);
-      showStatus('success', '৯:১৬ ভার্টিকাল ভিডিও সফলভাবে আপলোড ও সেভ হয়েছে!');
+      showStatus('success', '৯:১৬ ভার্টিকাল ভিডিও সফলভাবে স্থায়ীভাবে সেভ হয়েছে!');
     } catch (err) {
       console.error(err);
       setUploadProgress(null);
-      showStatus('error', 'ভিডিও আপলোড করতে সমস্যা হয়েছে। MP4 ফাইল নির্বাচন করুন।');
+      const msg = err instanceof Error ? err.message : 'ভিডিও আপলোড করতে সমস্যা হয়েছে। MP4 ফাইল নির্বাচন করুন।';
+      showStatus('error', msg);
     } finally {
       setProcessingVideo(false);
     }
@@ -379,9 +413,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-4">
               {/* QR Thumbnail Preview */}
               <div className="w-32 h-32 rounded-xl bg-white border border-slate-200 p-2 shrink-0 flex items-center justify-center overflow-hidden shadow-2xs">
-                {qrImageUrl ? (
+                {qrImageUrl && qrImageUrl.trim() ? (
                   <img
-                    src={qrImageUrl}
+                    src={qrImageUrl.trim()}
                     alt="Current QR"
                     className="w-full h-full object-contain rounded-lg"
                   />
@@ -472,16 +506,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-4">
               {/* 9:16 Live Player Preview */}
               <div className="w-24 aspect-[9/16] rounded-xl bg-black border border-slate-800 shrink-0 flex items-center justify-center overflow-hidden shadow-2xs">
-                {videoUrl ? (
+                {previewVideoSrc && previewVideoSrc.trim() ? (
                   <video
-                    src={videoUrl}
+                    src={previewVideoSrc.trim()}
                     className="w-full h-full object-contain bg-black"
                     controls
                     playsInline
                     muted
                   />
                 ) : (
-                  <span className="text-xs text-slate-500">ভিডিও নেই</span>
+                  <span className="text-xs text-slate-500 text-center px-1">
+                    {videoUrl ? 'লোড হচ্ছে...' : 'ভিডিও নেই'}
+                  </span>
                 )}
               </div>
 

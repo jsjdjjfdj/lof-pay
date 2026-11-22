@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Check, QrCode } from 'lucide-react';
 
 interface QrCodeCardProps {
@@ -8,6 +8,11 @@ interface QrCodeCardProps {
 export const QrCodeCard: React.FC<QrCodeCardProps> = ({ qrImageUrl }) => {
   const [downloading, setDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [qrImageUrl]);
 
   const handleDownload = async () => {
     if (!qrImageUrl) return;
@@ -49,13 +54,17 @@ export const QrCodeCard: React.FC<QrCodeCardProps> = ({ qrImageUrl }) => {
     }
   };
 
-  if (!qrImageUrl) {
+  const cleanQrUrl = qrImageUrl?.trim() || '';
+
+  if (!cleanQrUrl || imgError) {
     return (
       <div className="w-full max-w-[420px] mx-auto bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm text-center flex flex-col items-center justify-center min-h-[360px]">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
           <QrCode className="w-8 h-8" />
         </div>
-        <p className="text-sm font-semibold text-slate-500">QR Code Not Uploaded Yet</p>
+        <p className="text-sm font-semibold text-slate-500">
+          {imgError ? 'QR Code Unavailable' : 'QR Code Not Uploaded Yet'}
+        </p>
       </div>
     );
   }
@@ -66,9 +75,10 @@ export const QrCodeCard: React.FC<QrCodeCardProps> = ({ qrImageUrl }) => {
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-xl shadow-slate-100 transition-all">
         <div className="w-full aspect-square bg-white rounded-2xl p-2 flex items-center justify-center overflow-hidden">
           <img
-            src={qrImageUrl}
+            src={cleanQrUrl}
             alt="Payment QR Code"
             className="w-full h-full object-contain select-none"
+            onError={() => setImgError(true)}
           />
         </div>
 
